@@ -1,9 +1,12 @@
 ---
 title: "Coursera Practical Machine Learning Project"
 author: "Anna H"
-date: "2025-03-01"
-output: html_document
+date: "2025-03-05"
+output: 
+  html_document:
+    output_file: "index.html"
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, 
@@ -233,15 +236,15 @@ if (!file.exists("savedResults.rda")) {
         }
         
         # Find best hyperparameters
-        bestParams <- results[which.max(results[,3]),]
+        bestParams <- results[which.max(results[,4]),]
         mtry <- bestParams["mtry"]
         ntree <- bestParams["ntree"]
-        bootstrapSize <- bestParams["bootstrapSize"]
+        bootstrapValue <- bestParams["bootstrapSize"]
  
         # Use the best parameters in your existing train function
         # createDataPartition() is used to maintain the class distribution of the training data when sampling
         trainIndices <- createDataPartition(trainingClasse, 
-                                      p = bootstrapSize / length(trainingClasse), 
+                                      p = bootstrapValue / length(trainingClasse), 
                                       list = FALSE)
         bootstrapTraining <- training[trainIndices, ]
         bootstrapClasse <- trainingClasse[trainIndices]
@@ -255,12 +258,12 @@ if (!file.exists("savedResults.rda")) {
                ntree = ntree)
         
 
-  save(results, bestParams, basicModel, file = "savedResults.rda")
+  save(results, bestParams, basicModel, mtry, ntree, bootstrapValue, file = "savedResults.rda")
   
 } else {
-  # Load the saved results if the file exists
-  load("savedResults.rda")
-}
+# Load the saved results if the file exists
+   load("savedResults.rda")
+ }
 
 ```
 #### Algorithm Selection
@@ -281,7 +284,7 @@ For each combination, stratified sampling for bootstrapping was used and the mod
 <ul>
 <li>number of features - `r round(mtry)`</li>
 <li>number of trees - `r ntree`</li>
-<li>sample tree size - `r bootstrapSize`</li>
+<li>sample tree size - `r bootstrapValue`</li>
 </ul>
 
 
@@ -323,7 +326,7 @@ Next, those parameters were used to train a random forest model on a randomly se
 
 ```{r trainModelDisplay, eval=F}
         trainIndices <- createDataPartition(trainingClasse, 
-                                      p = bootstrapSize / length(trainingClasse), 
+                                      p = bootstrapValue / length(trainingClasse), 
                                       list = FALSE)
         bootstrapTraining <- training[trainIndices, ]
         bootstrapClasse <- trainingClasse[trainIndices]
@@ -445,6 +448,6 @@ text(x=0, y=1, labels=paste(col2, collapse="\n"), adj=c(0,1), family="mono", cex
 par(mfrow = c(1, 1))
 ```
 
-### Expected Out-of-Sample Error
+#### Expected Out-of-Sample Error
 
 Given the test set accuracy of `r percent(basicTestingMatrix$overall["Accuracy"], accuracy=0.01)`, the expected out-of-sample error is approximately 1-accuracy = `r percent(1-basicTestingMatrix$overall["Accuracy"], accuracy=0.01)`. This estimate is based on the test set performance, which is a bit lower than the training set accuracy. However, it's important to note that this error rate might still be a little optimistic, and the performance on entirely new data could be slightly lower.
