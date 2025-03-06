@@ -34,7 +34,7 @@ sapply(packages, load_or_install)
 
 ### Introduction
 
-This report details the development of a machine learning model for activity recognition using data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. The goal was to predict the manner in which they performed barbell lifts, classified into five categories (in the ***classe*** variable):  
+This report details the development of a machine learning model for activity recognition using data from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. The goal was to predict the manner in which they performed barbell lifts, classified into five categories (as the ***classe*** variable):  
   
 <ul>
 <li>A - exactly according to the specification</li>
@@ -57,14 +57,6 @@ data <- read.csv("pml-training.csv", na.strings = c("", "NA", "#DIV/0!"),
                                 cvtd_timestamp = "NULL",
                                 user_name = "NULL"))
 
-# testData <- read.csv("pml-testing.csv", na.strings = c("", "NA", "#DIV/0!"),
-#                  colClasses = c(new_window = "NULL",
-#                                 num_window = "NULL",
-#                                 raw_timestamp_part_1 = "NULL",
-#                                 raw_timestamp_part_2 = "NULL",
-#                                 cvtd_timestamp = "NULL",
-#                                 user_name = "NULL"))
- 
 # select only important features (as per paper describing the data)
 importantFeatures <- c(
         "roll_belt", "pitch_belt", "yaw_belt", "total_accel_belt",
@@ -78,16 +70,33 @@ importantFeatures <- c(
         "gyros_dumbbell_x", "gyros_dumbbell_y", "gyros_dumbbell_z",
         "magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z",
         "roll_forearm", "pitch_forearm", "yaw_forearm", "total_accel_forearm",
-        "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z"
-)
+        "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z")
 
 
 data <- data %>% select(all_of(importantFeatures), "classe")
 ```
 
-Our first step is to read in the data and clean it to make sure we only use the fields that are helpful in our predictions. The documentation for the original project that describes the data mentions 40 such fields out of the total 154. So, we will be using those 40 features as a starting point for our classification.
+Our first step was to read in the dataset, to clean it and to make sure we only use the features that are helpful for our predictions. The <a href="http://web.archive.org/web/20170519033209/http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf">documentation for the original project</a> (p.3) mentions 40 such variables out of the total 154 columns. So, we used those 40 features as a starting point for our classification.
 
-We will graph the distribution of the classes to get an better idea of the ***classe*** variable distribution in our data, and we will also check to make sure that are no rows left with missing information. And we see that there are `r sum(apply(data, 1, function(row) any(is.na(row))))` such rows.
+```{r importData2, eval=FALSE}
+
+# select only important features (as per paper describing the data)
+importantFeatures <- c(
+        "roll_belt", "pitch_belt", "yaw_belt", "total_accel_belt",
+        "accel_belt_x", "accel_belt_y", "accel_belt_z",
+        "gyros_belt_x", "gyros_belt_y", "gyros_belt_z",
+        "magnet_belt_x", "magnet_belt_y", "magnet_belt_z",
+        "roll_arm", "pitch_arm", "yaw_arm", "total_accel_arm",
+        "magnet_arm_x", "magnet_arm_y", "magnet_arm_z",
+        "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "total_accel_dumbbell",
+        "accel_dumbbell_x", "accel_dumbbell_y", "accel_dumbbell_z",
+        "gyros_dumbbell_x", "gyros_dumbbell_y", "gyros_dumbbell_z",
+        "magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z",
+        "roll_forearm", "pitch_forearm", "yaw_forearm", "total_accel_forearm",
+        "gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z")
+```
+
+To get an idea of the distribution of the *classe* variable that we wanted to predict, we graphed the dataset, and we checked that there are no rows left with missing information. And we see that there are `r sum(apply(data, 1, function(row) any(is.na(row))))` such rows out of a total of `r format(nrow(data), big.mark=",", scientific=FALSE)`.  
 
 
 ```{r separateClasse, echo=FALSE}
@@ -98,7 +107,7 @@ ggplot(classeCount, aes(x = classe, y = percentage)) +
         geom_bar(stat = "identity", fill = "lightblue", color = "lightblue3") +
         geom_text(aes(label = scales::percent(percentage, accuracy = 0.1)), vjust = -0.5) +
         scale_y_continuous(labels = scales::percent_format(accuracy=1), limits = c(0,0.3)) +
-        labs(title = "Distribution of Classe Variables",
+        labs(title = "Distribution of the Classe Variable",
              x = "Classe",
              y = "Count") +
         theme_minimal() +
@@ -127,9 +136,9 @@ testing <- testing %>% select(-last_col())
 
 ```
 
-Next, the *classe* variable is separated from the dataset for ease of model training.  We then set a seed for reproducibility and split all of the data (the main dataset with the measurements and the one containing the classe information) into matching training and testing sets. The training dataset will be 70% of the original (`r format(nrow(training), big.mark=",", scientific=FALSE)` total observations) and the rest (`r format(nrow(testing), big.mark=",", scientific=FALSE)` total observations) will be left for model testing.
-
-We will now take a look at the variability within our data set by looking at the coefficients of variation (CV) for each feature to see how large or small it is. First we see that there are several variables that have extreme (>1,000 or 10 times the mean) coefficients of variation. Suggesting extreme amounts of variation within the dataset.
+After setting a seed for reproducibility, we separated the *classe* variable from the dataset and split all of the data (the main dataset with the measurements and the one containing the classe information) into matching training and testing sets. The training dataset was set to be 70% of the original (at `r format(nrow(training), big.mark=",", scientific=FALSE)` total observations) and the rest (`r format(nrow(testing), big.mark=",", scientific=FALSE)` total observations) was left for model testing.  
+  
+Next, we took a look at the variability within our data by looking at the coefficients of variation (CV) for each feature to see how large or small it was. We saw that there were several variables that had extreme (>1,000 or 10 times the mean) coefficients of variation, which suggested extreme amounts of variation within the dataset.  
 
 
 ``` {r highCV, echo=FALSE}
@@ -151,7 +160,7 @@ madOutlierName <- madOutlier$variable
 madOutlierValue <- madOutlier$mad
 ```
 
-The median absolute deviation (MAD) values, which are less sensitive to outliers than CVs also shows quite a bit of variability as seen on the chart below (one extreme outlier has been left off - `r madOutlierName` with a value of `r sprintf("%.2f", madOutlierValue)`). 
+The median absolute deviation (MAD) values, which are less sensitive to outliers than CVs also showed quite a bit of variability as can be seen on the chart below (one extreme outlier has been left off the chart - `r madOutlierName` with a value of `r sprintf("%.2f", madOutlierValue)`). 
 
 
 ``` {r MadValues2, echo=FALSE}
@@ -166,7 +175,8 @@ ggplot(madValuesFrame, aes(x = mad, y = reorder(variable, mad))) +
             family = "Arial", 
             hjust = 0,
             nudge_x = 5) +    
-    labs(x = "MAD Value", y = "") +  
+    labs(title = "MAD Values of Features",
+            x = "MAD Value", y = "") +  
     # geom_text(aes(label = sprintf("%s (%.2f)", variable, mad)), hjust = -0.2, vjust = 0.5) +
     scale_x_continuous(limits = c(0, max(madValuesFrame$mad) * 1.2)) +
     labs(x = "MAD Value", y = "") +
@@ -174,6 +184,7 @@ ggplot(madValuesFrame, aes(x = mad, y = reorder(variable, mad))) +
     theme(
         axis.text.y = element_blank(),  # Remove y-axis labels
         ) +
+     theme(plot.title = element_text(hjust = 0.5)) +
   coord_cartesian(xlim = c(0, max(madValuesFrame$mad) * 1.3), clip = "off")
 
 ```
@@ -268,17 +279,17 @@ if (!file.exists("savedResults.rda")) {
 ```
 #### Algorithm Selection
 
-Since this a classification problem, we will be using a decision tree approach to get our *classe* prediction. However, a basic decision tree creates only one tree and may not capture the necessary relationships leading to a low level of accuracy. Therefore we will be utilizing an instance of bagging, which will allow us to train multiple models to get a better result. In this case, we chose a random forest method for the final model creation due its strong predictive performance and ability to capture non-linear relationships between variables without explicit specification of their relationships. Random forests are also known to help prevent overfitting, which is likely to happen when there's high variance, like in this data. This method also provides measures of variable importance that can potentially reduce the number of variables needed. 
-
-
+Since this is a classification problem, we used a decision tree approach to get our *classe* prediction. However, a basic decision tree creates only one tree and may not capture the necessary relationships and may lead to a low level of accuracy. Therefore, we decided to utilize an instance of bagging, which allowed us to train multiple models to get a better result. In this case, we chose a **random forest** method for the final model creation due its strong predictive performance and its ability to capture non-linear relationships between variables without explicit specification of their relationships. Random forests are also known to help prevent overfitting, which is likely to happen when there's high variance, as is the case with this data. This method also provides measures of feature importance that can potentially reduce the number of variables needed.  
+  
 #### Cross-Validation and Hyperparameter Tuning
-An important step in training a good model is to select the appropriate parameters. A grid search with 10-fold k-fold cross-validation was done to tune the hyperparameters for the  
+An important step in training a good model is to select the appropriate tuning parameters. A grid search with 10-fold k-fold cross-validation was done to tune the hyperparameters for the following values:  
   
 <ul>
-<li>number of trees to grow (*ntree* is evaluated at values of 100, 500 and 1000</li>
-<li>number of features to randomly sample at each tree split (*mtry* is evaluated at 6, 13 and 20)</li>
-<li>sample tree sizes (bootstrap size is evaluated at 500, 1000 and 1500)</li>
+<li>number of trees to grow (*ntree* was evaluated at values of 100, 500 and 1000</li>
+<li>number of features to randomly sample at each tree split (*mtry* was evaluated at 6, 13 and 20)</li>
+<li>sample tree sizes (bootstrap size was evaluated at 500, 1000 and 1500)</li>
 </ul>
+
 For each combination, stratified sampling for bootstrapping was used and the model's accuracy was evaluated using cross-validation. Unfortunately, this negatively affected the processing time. The best parameters were selected as follows:  
   
 <ul>
@@ -322,7 +333,7 @@ testingWeightedF1 <- sum(basicTestingMatrix$byClass[, "F1"] * classCounts) / sum
 ```
 
 ### Model Training and Evaluation
-Next, those parameters were used to train a random forest model on a randomly selected part of the training set. 
+It was not practical to use the whole training set due to its size, so, next, we used the selected best parameters to train a random forest model on a randomly selected part of the training set (that consisted of `r bootstrapValue` data points). 
 
 ```{r trainModelDisplay, eval=F}
         trainIndices <- createDataPartition(trainingClasse, 
@@ -342,24 +353,24 @@ Next, those parameters were used to train a random forest model on a randomly se
 ```
 
 
-After making predictions the model is evaluated by looking at the confusion matrix.  
+After making predictions the model was evaluated by looking at its confusion matrix (see below).  
 
-Overall, the model appear to have `r percent(basicMatrix$overall["Accuracy"], accuracy=0.01)` accuracy, which means that correctly classifies the vast majority of data. The Cohen's kappa for our model is `r round(basicMatrix$overall["Kappa"], 3)`, a value very close to 1. This means that the agreement between predicted and actual classes is not likely to have happened by chance.
+Overall, the model appeared to have a `r percent(basicMatrix$overall["Accuracy"], accuracy=0.01)` accuracy, which means that it correctly classified most of the data. The Cohen's kappa for our model was `r round(basicMatrix$overall["Kappa"], 3)`, a value very close to 1. This means that the agreement between predicted and actual classes is not likely to have happened by chance.
 
-The average of the F1 scores across the classes is `r percent(macroF1, accuracy = 0.01)`, which also suggests a high prediction quality that is also confirmed by the weighted-averaged of the F1 scores (`r percent(weightedF1, accuracy = 0.01)`).
+The average of the F1 scores across the classes was `r percent(macroF1, accuracy = 0.01)`, which also suggests a high prediction quality, and that is also confirmed by the weighted-average of the F1 scores (`r percent(weightedF1, accuracy = 0.01)`).
 
-The confusion matrix below shows that the model performs well across all classes, with high sensitivity, specificity, and F1 scores for each class. It does have slightly more difficulty identifying Class B (sensitivity - `r percent(basicMatrix$byClass["Class: B", "Recall"], accuracy=0.01)`) and has a high rate of false positives for Class C (precision - `r percent(basicMatrix$byClass["Class: C", "Precision"], accuracy=0.01)`.) It is likely that the issues for classes B and C were caused because both deal with the dumbbell being at the half-way point, making it hard to discern between the two classes from measurements alone. Even so, all the model quality measurements show that this is a strong model that should provide quality results.  
+As can be seen in the confusion matrix below, the model performed well across all classes, with high sensitivity, specificity, and F1 scores for each class. It did have slightly more difficulty identifying Class B (sensitivity - `r percent(basicMatrix$byClass["Class: B", "Recall"], accuracy=0.01)`) and had a high rate of false positives for Class C (precision - `r percent(basicMatrix$byClass["Class: C", "Precision"], accuracy=0.01)`.) It is likely that the issues for classes B and C were caused because both deal with the dumbbell being at the half-way point, making it hard to discern between the two classes by using measurements alone. Even so, all the model quality metrics show that this is a strong model that should provide quality results.  
 
 
 ``` {r confusionMatrix, echo=F}
 print(basicMatrix)
 ```
 
-To confirm that the model is not overfitting, we will test its predictions on the testing data set that we separated from the training set earlier. With this never seen data we can confirm that the model is still performing well across all classes, with high accuracy (`r percent(basicTestingMatrix$overall["Accuracy"], accuracy=0.01)`), the difference of about `r percent(basicMatrix$overall["Accuracy"]-basicTestingMatrix$overall["Accuracy"], accuracy=0.01)` with the accuracy for the training set suggests there might be slight overfitting. The model also has a strong kappa (`r round(basicTestingMatrix$overall["Kappa"], 3)`) and the average F1 of `r percent(testingMacroF1, accuracy = 0.01)`, which still shows a strong agreement between predicted and actual classes and a good prediction quality.  
+To confirm that the model was not overfitting, we tested its performance on the testing data that we separated from the original dataset earlier. With this unseen data we confirmed that the model was still performing well across all classes achieving high accuracy (`r percent(basicTestingMatrix$overall["Accuracy"], accuracy=0.01)`). The minor difference of approximately `r percent(basicMatrix$overall["Accuracy"]-basicTestingMatrix$overall["Accuracy"], accuracy=0.01)` compared to the training set's accuracy suggests minimal overfitting. The model also has a strong kappa (`r round(basicTestingMatrix$overall["Kappa"], 3)`) and the average F1 of `r percent(testingMacroF1, accuracy = 0.01)`, which still shows a strong agreement between predicted and actual classes and a good prediction quality.  
   
 The model still struggles the most with correctly identifying Class B instances (with lowest sensitivity of all classes at `r percent(basicTestingMatrix$byClass["Class: B", "Recall"], accuracy=0.01)`) and is least confident in its Class C predictions (lowest precision at `r percent(basicTestingMatrix$byClass["Class: C", "Precision"], accuracy=0.01)`). Although these figures are slightly below the metrics from the training set, they are high enough to show that the model is still performing well even on unseen data.
 
-When we create an ROC curve for both the training and testing set models we can also see that the area under the curve for each of the classes in both models is very close the the perfect measure of 1, confirming that the model is quite good at distinguishing between classes across various thresholds.
+When we create an ROC curve for both the training and testing set results we can also see that the area under the curve for each of the classes in both sets is very close the the perfect measure of 1, confirming that the model is quite good at distinguishing between classes across various thresholds.
 
 
 ```{r ROCcurve, echo=FALSE, fig.width=12}
